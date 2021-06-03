@@ -1,10 +1,14 @@
-# Redis 过期处理
+# Redis 过期处理和内存淘汰策略
+
+## redis过期策略
 
 分析：Redis 对过期键值对的处理，可以说是日经题。核心就是懒惰删除+定期删除。前者很容易记忆，后者很容易忽略。而要刷亮点，要从 RDB， AOF 和 主从复制三个不同处理策略上着手。
 
 ![过期策略](img/expired.png)
 
-答案： Redis 删除过期键值对，主要依赖于两种方式，定期删除和懒惰删除。
+答案： Redis 删除过期键值对，主要依赖于两种方式，定期删除和懒惰删除(通常结合使用)，以及不常用的定时策略。
+
+定时策略是指在设置key过期的同时，为该key创建一个定时器，即每个key都会创建一个定时器。
 
 定期删除是指 Redis 会定期遍历数据库，检查过期的 key 并且执行删除。它的特点是随机检查，点到即止。它并不会一次遍历全部过期 key，然后删除，而是在规定时间内，能删除多少就删除多少。这是为了平衡 CPU 开销和内存消耗。
 
@@ -34,3 +38,19 @@ Redis 的另外一个删除策略是懒惰删除，即如果在访问某个 key 
 - Redis key 过期之后，还能读到数据吗？
 - 为什么有时候 key 已经过期了，但是还能读到数据？
 - 如何解决 Redis 从库 key 过期依然返回数据的问题？
+
+
+## 内存淘汰策略
+- volatile-lru -> Evict using approximated LRU among the keys with an expire set.
+- allkeys-lru -> Evict any key using approximated LRU.
+- volatile-lfu -> Evict using approximated LFU among the keys with an expire set.
+- allkeys-lfu -> Evict any key using approximated LFU.
+- volatile-random -> Remove a random key among the ones with an expire set.
+- allkeys-random -> Remove a random key, any key.
+- volatile-ttl -> Remove the key with the nearest expire time (minor TTL)
+- noeviction -> Don't evict anything, just return an error on write operations.
+
+其中，LRU/LFU算法性能最优的实现，也是各大厂技术面的常问题。leetcode上有两个这样的题目，要求是缓存的加入put()，缓存读取get()，都要在O(1)内实现：
+
+- LRU：https://leetcode.com/problems/lru-cache/description/ 或者 https://leetcode-cn.com/problems/lru-cache/
+- LFU：https://leetcode.com/problems/lfu-cache/description/ 或者 https://leetcode-cn.com/problems/lfu-cache/

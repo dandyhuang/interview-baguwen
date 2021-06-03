@@ -1,0 +1,1 @@
+### netstat看tcp连接的时候有关注过time_wait和close_wait吗？

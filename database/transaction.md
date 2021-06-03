@@ -54,8 +54,14 @@ innodb 引擎是通过MVCC来支持事务的。（到这一步，停下来，接
 3. 重复读：事务执行过程查询结果都是一致的，innodb 默认级别。     问题：               幻读
 4. 串行化：读写都会相互阻塞                                  问题：
 
+之后会问你具体阐述一下这几种概念
+脏读：指一个线程中的事务读取到了另外一个线程中未提交的数据。
+不可重复读（虚读）：指一个线程中的事务读取到了另外一个线程中提交的update的数据。
+幻读：指一个线程中的事务读取到了另外一个线程中提交的insert的数据。
+
 MVCC 方向：
 innodb 引擎利用了 `Read View` 来支持提交读和重复读。`Read View`里面维护这三个变量：
+
 1. up_limit_id：已提交事务ID + 1
 2. low_limit_id：最大事务ID + 1
 3. txn_ids：当前执行的事务ID
@@ -144,6 +150,7 @@ Redis的`AOF`机制也面临类似的问题，即`AOF`也不是立刻刷盘，�
 
 分析：概念题。最好的回答是用`undo`, `redo`, `binlog`来讲述清楚事务与回滚，主从同步复制。这里我们做一个简要的回答，把精髓答出来。
 
+
 答案：
 1. `redo log` 是`innodb`引擎产生的，主要用于支持MySQL事务，MySQL会先写`redo log`，而后在写`binlog`。`redo log`可以保证即使数据库异常重启，数据也不会丢失
 2. `undo log` 是`innodb`引擎产生的，主要时候用于解决事务回滚和MVCC。数据修改的时候，不仅记录`redo log`，也会记录`undo log`。在事务执行失败的时候，会使用`undo log`进行回滚；
@@ -158,7 +165,33 @@ Redis的`AOF`机制也面临类似的问题，即`AOF`也不是立刻刷盘，�
 1. `binlog` 刷盘可以通过`sync_binlog`参数来控制。0-系统自由判断，1-commit刷盘，N-每N个事务刷盘
 2. `redo log`刷盘可以通过参数`innodb_flush_log_at_trx_commit`控制。0-写入`log buffer`，每秒刷新到盘；1-每次提交；2-写入到`OS cache`，每秒刷盘；
 
+ (扩展点3，WAL和脏页等是什么)
+1.  MySQL的WAL（Write-Ahead Logging）技术，先写日志，再写磁盘
+2.  MySQL 从 内存更新到磁盘的过程，称为刷脏页的过程
+
+### update操作究竟做了什么
+a、执行器查找指定记录，如果记录所在的数据页在内存中，就直接返回给执行器；否则，需要先从磁盘读入内存，然后再返回。
+
+b、执行器拿到Innodb存储引擎接口给的数据，执行update操作，得到新的数据，然后调用Innodb存储引擎的接口写入数据。
+
+c、innodb存储引擎将这行新数据更新到内存中，同时将这个更新操作记录到redo log里面，此时redo log处于prepare状态。然后告知执行器执行完成了，随时可以提交事务。
+
+d、执行器生成update操作的binlog，并把binlog写入磁盘。
+
+e、执行器调用引擎的提交事务接口，引擎把刚刚写入的redo log改成提交（commit）状态，更新完成。
+
+核心: 这里涉及到了上面阐述的两阶段的提交过程
+
+1）集群正常运行的前提下：要有完整的binlog来保证从库的数据一致性。要有commit状态的redo log来保证主库的数据一致性 
+2）发生crash的情况下：有prepare状态的redo log和完整的binlog也能保证主从库的数据一致性
+
+
+### select语句的执行过程
+
+答案：
+mysql可以分为server层和存储引擎层，客户端和服务器发起连接，mysql连接器管理链接、密码等，校验成功后，分析器会去解析`sql`, 之后优化器决定使用哪个索引，最后执行器操作引擎，获取存储引擎的数据，返回结果
 
 ## Reference
 [一文理解MySQL MVCC](https://zhuanlan.zhihu.com/p/29150809)
 [innodb中的事务隔离级别和锁的关系](https://tech.meituan.com/2014/08/20/innodb-lock.html)
+[MySQL Update语句是怎么执行的](https://cloud.tencent.com/developer/article/1624168)
