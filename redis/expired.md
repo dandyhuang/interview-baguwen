@@ -53,4 +53,6 @@ Redis 的另外一个删除策略是懒惰删除，即如果在访问某个 key 
 其中，LRU/LFU算法性能最优的实现，也是各大厂技术面的常问题。leetcode上有两个这样的题目，要求是缓存的加入put()，缓存读取get()，都要在O(1)内实现：
 
 - LRU：https://leetcode.com/problems/lru-cache/description/ 或者 https://leetcode-cn.com/problems/lru-cache/
+  [lru](https://github.com/hashicorp/golang-lru)
 - LFU：https://leetcode.com/problems/lfu-cache/description/ 或者 https://leetcode-cn.com/problems/lfu-cache/
+
